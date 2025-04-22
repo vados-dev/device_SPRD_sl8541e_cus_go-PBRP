@@ -7,31 +7,31 @@ on:
       MANIFEST_URL:
         description: 'MANIFEST_URL, Works below android 10 with this repo (if want to use SSH keys, use git@github.com:XXXXX)'
         required: true
-        default: 'https://github.com/mlm-games/platform_manifest_twrp_omni'
+        default: 'https://github.com/PitchBlackRecoveryProject/manifest_pb'
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
-        default: 'twrp-5.1'
+        default: 'android-8.1'
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/zh-xijun/twrp_device_'
+        default: 'https://github.com/vados-dev/device_SPRD_sl8541e_cus_go-PBRP'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
-        default: 'twrp-4.4'
+        default: 'android-8.1'
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
-        default: 'device/'
+        default: 'device/SPRD'
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
-        default: ''
+        default: 'sl8541e_cus_go'
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME (without including .mk, Example: omni_7304F)'
         required: true
-        default: 'omni_'
+        default: 'omni_sl8541e_cus_go'
       LDCHECK:
         description: 'Use LDCHECK' # I can use only 10 inputs on a workflow file
         required: false
@@ -41,6 +41,18 @@ on:
         description: 'Path of blobs to check' # Use it know what kind of dependencies your missing for decryption blobs.
         required: true
         default: 'system/bin/qseecomd'
+      BUILD_TARGET:
+        description: 'Build Target (use "pbrp" for Android 11+)'
+        required: true
+        default: 'pbrp'
+        type: choice
+        options:
+        - adbd pbrp
+        - pbrp
+        - recovery
+        - boot
+        - vendorboot
+
 #      COMMON_TREE_URL:
 #        description: 'COMMON_TREE_URL (if no common tree, leave blank)'
 #        required: false
@@ -50,6 +62,7 @@ on:
 
 jobs:
   build:
+    name: Build PBRP by ${{ github.actor }}
     if: github.event.repository.owner.id == github.event.sender.id
     runs-on: ubuntu-22.04
     container:
@@ -59,6 +72,11 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       OUTPUT_DIR: android-recovery/out/target/product
     steps:
+    - name: Initial Setup
+      run: |
+        echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(TZ=UTC date +%Y%m%d)" >> $GITHUB_ENV
+
     - name: Display Run Parameters
       run: |
         echo "::group::User Environment Variables"
@@ -69,6 +87,7 @@ jobs:
         echo "Device Path: ${{ inputs.DEVICE_PATH }}"
         echo "Device Name: ${{ inputs.DEVICE_NAME }}"
         echo "Makefile Name: ${{ inputs.MAKEFILE_NAME }}"
+        echo "Build target: ${{ inputs.BUILD_TARGET }}"
         echo "::endgroup::"
  
     - name: Check Out
@@ -114,6 +133,10 @@ jobs:
         git config --global user.name "${{ github.actor }}"
         git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
         repo init --depth=1 -u ${{ inputs.MANIFEST_URL }} -b ${{ inputs.MANIFEST_BRANCH }}
+        sed -i 's/android_system_core/android_system_core_old/' .repo/manifests/omni-aosp.xml ;
+        sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/omni-aosp.xml ;
+        sed -i 's/android_frameworks_base/android_frameworks_base_old/g' .repo/manifests/remove-minimal.xml ;
+        sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/twrp-extras.xml ;
       id: pwd
           
     - name: Repo Sync
@@ -156,24 +179,64 @@ jobs:
       shell: bash
       run: |
         source build/envsetup.sh
-        export ALLOW_MISSING_DEPENDENCIES=true
-        lunch ${{ inputs.MAKEFILE_NAME }}-eng && make clean && make recoveryimage -j$(nproc --all)
+        export ALLOW_MISSING_DEPENDENCIES=true        
+        lunch ${{ inputs.MAKEFILE_NAME }}-eng && make clean && ${{ inputs.BUILD_TARGET }} -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
 
+    - name: Check Build Makefile
+      run: |
+        cd android-recovery
+        if [ -f out/target/product/${{ inputs.DEVICE_NAME }}/recovery.img ]; then
+            echo "BUILD_TARGET_NAME=recovery" >> $GITHUB_ENV
+        elif [ -f out/target/product/${{ inputs.DEVICE_NAME }}/boot.img ]; then
+            echo "BUILD_TARGET_NAME=boot" >> $GITHUB_ENV
+        else
+            echo "BUILD_TARGET_NAME=vendor_boot" >> $GITHUB_ENV
+        fi
+
+    - name: Set Build Date # Output will be use in Release
+      run: |
+        echo "BUILD_DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      if: inputs.upload_releases == false || github.event_name != 'workflow_dispatch'
+      with:
+        name: PBRP-Recovery-${{ env.DEVICE_NAME }}-${{ env.BUILD_DATE }}
+        path: |
+          ${{ env.OUTPUT_DIR }}/*.img
+          ${{ env.OUTPUT_DIR }}/*.tar
+          ${{ env.OUTPUT_DIR }}/*vbmeta*
+          ${{ env.OUTPUT_DIR }}/*.cpio
+
     - name: Upload to Release
-      uses: softprops/action-gh-release@v2
+      if: success()
+      uses: softprops/action-gh-release@master
+      #uses: softprops/action-gh-release@v2
       with:
         files: | 
-          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/recovery.img
-          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/*.zip
+          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/${{ env.BUILD_TARGET_NAME }}.img
           ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/*vendor*.img
-        name: ${{ inputs.DEVICE_NAME }}-${{ github.run_id }}
+          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/PBRP*.zip
+          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/ramdisk-recovery.*
+          ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/*.tar.gz
+        
+        name: ${{ inputs.DEVICE_NAME }}-${{ github.run_id }} (${{ env.BUILD_DATE }})
         tag_name: ${{ github.run_id }}
         body: |
+          Date: ${{ env.BUILD_DATE }}
           Manifest: ${{ inputs.MANIFEST_BRANCH }}
           Device: ${{ inputs.DEVICE_NAME }}
-          Device tree & Branch: ${{ inputs.DEVICE_TREE_URL }} - ${{ inputs.DEVICE_TREE_BRANCH }}
+          Build Type: ${{ inputs.BUILD_TARGET }}
+          Device tree & Branch: ${{ inputs.DEVICE_TREE_URL }} ${{ inputs.DEVICE_TREE_BRANCH }}
+
+          ## Build Status
+          - Recovery Image MD5: `${{ env.MD5_IMG }}`
+          - ZIP Package MD5: `${{ env.MD5_ZIP }}`
+
+          > Note: This is an automated build. Please test thoroughly before using.
         prerelease: true
+        draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -187,3 +250,28 @@ jobs:
         python3 ldcheck -p system/lib64:vendor/lib64:system/lib:vendor/lib -d ${{ inputs.LDCHECKPATH }}
         echo "Done checking missing dependencies. Review, and reconfigure your tree."
       continue-on-error: true
+
+    - name: Calculate Build Time
+      if: always()
+      run: |
+        BUILD_END=$(date +%s)
+        BUILD_DURATION=$((BUILD_END - BUILD_START))
+        
+        hours=$((BUILD_DURATION / 3600))
+        minutes=$(((BUILD_DURATION % 3600) / 60))
+        seconds=$((BUILD_DURATION % 60))
+        
+        echo "Build completed in ${hours}h ${minutes}m ${seconds}s"
+        
+        # Save build statistics
+        echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
+        echo "BUILD_HOURS=${hours}" >> $GITHUB_ENV
+        echo "BUILD_MINUTES=${minutes}" >> $GITHUB_ENV
+        echo "BUILD_SECONDS=${seconds}" >> $GITHUB_ENV
+
+    - name: Cleanup Workspace
+      if: always()
+      run: |
+        cd ${{ github.workspace }}
+        rm -rf android-recovery
+        df -h
