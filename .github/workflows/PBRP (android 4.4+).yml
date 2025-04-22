@@ -1,4 +1,4 @@
-name: Recovery Build TWRP 4.4+ (Ubuntu 18.04)
+name: Recovery Build PBRP 4.4+ (Ubuntu 18.04)
 permissions:
   contents: write
 on:
@@ -20,10 +20,6 @@ on:
         description: 'DEVICE_TREE_BRANCH'
         required: true
         default: 'android-8.1'
-      DEVICE_PATH:
-        description: 'DEVICE_PATH'
-        required: true
-        default: 'device/SPRD'
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
@@ -71,6 +67,8 @@ jobs:
       LC_ALL: "C.UTF-8"
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       OUTPUT_DIR: android-recovery/out/target/product
+      DEVICE_PATH: device_tree
+
     steps:
     - name: Initial Setup
       run: |
@@ -84,7 +82,6 @@ jobs:
         echo "Manifest Branch: ${{ inputs.MANIFEST_BRANCH }}"
         echo "Device Tree URL: ${{ inputs.DEVICE_TREE_URL }}"
         echo "Device Tree Branch: ${{ inputs.DEVICE_TREE_BRANCH }}"
-        echo "Device Path: ${{ inputs.DEVICE_PATH }}"
         echo "Device Name: ${{ inputs.DEVICE_NAME }}"
         echo "Makefile Name: ${{ inputs.MAKEFILE_NAME }}"
         echo "Build target: ${{ inputs.BUILD_TARGET }}"
@@ -146,7 +143,7 @@ jobs:
       
     - name: Clone device tree
       run: |
-        git clone ${{ inputs.DEVICE_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ inputs.DEVICE_PATH }}
+        git clone ${{ inputs.DEVICE_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ env.DEVICE_PATH }}
       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
 
 #    - name: Clone common tree
@@ -159,7 +156,7 @@ jobs:
 
     - name: Sync Device Dependencies
       run: |
-        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ inputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
+        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ env.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
         repo sync -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
       continue-on-error: true
