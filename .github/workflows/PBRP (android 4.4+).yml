@@ -55,8 +55,7 @@ on:
 #      COMMON_PATH:
 #        description: 'COMMON_PATH (if no common tree, leave blank)'
 #        required: false
-
-jobs:
+jobs: 
   build:
     name: Build PBRP by ${{ github.actor }}
     if: github.event.repository.owner.id == github.event.sender.id
