@@ -49,20 +49,22 @@ on:
         - boot
         - vendorboot
 
-jobs: 
+jobs:
   binary_test_linuxes:
-   strategy:
-    fail-fast: false
-    matrix:
-          container:
-              - centos:7
-              - ubuntu:18.04
-              - "quay.io/pypa/manylinux2014_x86_64"
+    strategy:
+      fail-fast: false
+      matrix:
+       container:
+          - "ghcr.io/catthehacker/ubuntu:runner-18.04"
+         #- centos:7
+         #- ubuntu:18.04
+         #- "quay.io/pypa/manylinux2014_x86_64"
     runs-on: "ubuntu-latest"
     container: ${{ matrix.container }}
   build:
     name: Build PBRP by ${{ github.actor }}
-    #runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
     #container:
       #image: ghcr.io/catthehacker/ubuntu:runner-18.04
     env:
@@ -265,3 +267,4 @@ jobs:
          cd ${{ github.workspace }}
          rm -rf android-recovery
          df -h
+         
