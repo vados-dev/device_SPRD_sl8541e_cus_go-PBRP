@@ -56,7 +56,6 @@ jobs:
     container:
       image: ghcr.io/catthehacker/ubuntu:runner-18.04
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       LC_ALL: "C.UTF-8"
       OUTPUT_DIR: android-recovery/out/target/product
       DEVICE_PATH: device_tree
@@ -65,6 +64,10 @@ jobs:
       contents: write
 
     steps:
+    - name: "Run dummy script in container"
+      run: |
+        docker run --rm -v $PWD/downloaded_scripts:/scripts ${{ matrix.container }} /bin/bash -c "chmod +x /scripts/dummy_script.sh && /scripts/dummy_script.sh"
+
     - name: Initial Setup
       run: |
         echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
@@ -84,7 +87,7 @@ jobs:
         echo "::endgroup::"
  
     - name: Check Out
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Cleanup The Actions Workspace Using Custom Composite Run Actions
     - name: Cleanup
