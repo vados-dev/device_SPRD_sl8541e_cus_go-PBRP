@@ -50,11 +50,21 @@ on:
         - vendorboot
 
 jobs: 
+  binary_test_linuxes:
+   strategy:
+    fail-fast: false
+    matrix:
+          container:
+              - centos:7
+              - ubuntu:18.04
+              - "quay.io/pypa/manylinux2014_x86_64"
+    runs-on: "ubuntu-latest"
+    container: ${{ matrix.container }}
   build:
     name: Build PBRP by ${{ github.actor }}
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/catthehacker/ubuntu:runner-18.04
+    #runs-on: ubuntu-latest
+    #container:
+      #image: ghcr.io/catthehacker/ubuntu:runner-18.04
     env:
       LC_ALL: "C.UTF-8"
       OUTPUT_DIR: android-recovery/out/target/product
@@ -64,17 +74,17 @@ jobs:
       contents: write
 
     steps:
-    - name: "Run dummy script in container"
-      run: |
+     - name: "Run dummy script in container"
+       run: |
         docker run --rm -v $PWD/downloaded_scripts:/scripts ${{ matrix.container }} /bin/bash -c "chmod +x /scripts/dummy_script.sh && /scripts/dummy_script.sh"
 
-    - name: Initial Setup
-      run: |
+     - name: Initial Setup
+       run: |
         echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
         echo "BUILD_DATE=$(TZ=UTC date +%Y%m%d)" >> $GITHUB_ENV
 
-    - name: Display Run Parameters
-      run: |
+     - name: Display Run Parameters
+       run: |
         echo "::group::User Environment Variables"
         echo "Manifest URL: ${{ inputs.MANIFEST_URL }}"
         echo "Manifest Branch: ${{ inputs.MANIFEST_BRANCH }}"
@@ -86,25 +96,25 @@ jobs:
         echo "Build target: ${{ inputs.BUILD_TARGET }}"
         echo "::endgroup::"
  
-    - name: Check Out
-      uses: actions/checkout@v4
+     - name: Check Out
+       uses: actions/checkout@v4
 
-    # Cleanup The Actions Workspace Using Custom Composite Run Actions
-    - name: Cleanup
-      uses: rokibhasansagar/slimhub_actions@main
-      # That's it! Now use your normal steps
+     # Cleanup The Actions Workspace Using Custom Composite Run Actions
+     - name: Cleanup
+       uses: rokibhasansagar/slimhub_actions@main
+       # That's it! Now use your normal steps
 
-    - name: Prepare the environment
-      run: |
+     - name: Prepare the environment
+       run: |
         sudo apt update
         sudo apt -y upgrade
         sudo apt install -yq bc bison build-essential curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python bash tmux
 
-    - name: Install OpenJDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '8'
+     - name: Install OpenJDK
+       uses: actions/setup-java@v4
+       with:
+         distribution: 'zulu'
+         java-version: '8'
 
 #    - name: Setup SSH Keys
 #      if: ${{ startsWith(github.event.inputs.MANIFEST_URL, 'git@github.com') }}
@@ -113,90 +123,90 @@ jobs:
 #          ssh-private-key: |
 #              ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Install repo
-      run: |
-        sudo ln -sf /usr/bin/python3 /usr/bin/python
-        mkdir ~/bin
-        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-        chmod a+x ~/bin/repo
-        sudo ln -sf ~/bin/repo /usr/bin/repo
+     - name: Install repo
+       run: |
+         sudo ln -sf /usr/bin/python3 /usr/bin/python
+         mkdir ~/bin
+         curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+         chmod a+x ~/bin/repo
+         sudo ln -sf ~/bin/repo /usr/bin/repo
       
-    - name: Initialize repo
-      run: |
-        mkdir android-recovery
-        cd android-recovery
-        echo "android-recovery-folder=$(pwd)" >> $GITHUB_OUTPUT
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-        repo init --depth=1 -u ${{ inputs.MANIFEST_URL }} -b ${{ inputs.MANIFEST_BRANCH }}
-        sed -i 's/android_system_core/android_system_core_old/' .repo/manifests/omni-aosp.xml ;
-        sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/omni-aosp.xml ;
-        sed -i 's/android_frameworks_base/android_frameworks_base_old/g' .repo/manifests/remove-minimal.xml ;
-        sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/twrp-extras.xml ;
-      id: pwd
+     - name: Initialize repo
+       run: |
+         mkdir android-recovery
+         cd android-recovery
+         echo "android-recovery-folder=$(pwd)" >> $GITHUB_OUTPUT
+         git config --global user.name "${{ github.actor }}"
+         git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+         repo init --depth=1 -u ${{ inputs.MANIFEST_URL }} -b ${{ inputs.MANIFEST_BRANCH }}
+         sed -i 's/android_system_core/android_system_core_old/' .repo/manifests/omni-aosp.xml ;
+         sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/omni-aosp.xml ;
+         sed -i 's/android_frameworks_base/android_frameworks_base_old/g' .repo/manifests/remove-minimal.xml ;
+         sed -i 's/android_frameworks_base/android_frameworks_base_old/' .repo/manifests/twrp-extras.xml ;
+       id: pwd
           
-    - name: Repo Sync
-      run: |
-        repo sync -j$(nproc --all) --force-sync
-      working-directory: android-recovery
+     - name: Repo Sync
+       run: |
+         repo sync -j$(nproc --all) --force-sync
+       working-directory: android-recovery
       
-    - name: Clone device tree
-      run: |
-        git clone ${{ inputs.DEVICE_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ env.DEVICE_PATH }}
-      working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
+     - name: Clone device tree
+       run: |
+         git clone ${{ inputs.DEVICE_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ env.DEVICE_PATH }}
+       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
 
-    - name: Sync Device Dependencies
-      run: |
-        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ env.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
-        repo sync -j$(nproc --all)
-      working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
-      continue-on-error: true
+     - name: Sync Device Dependencies
+       run: |
+         bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ env.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
+         repo sync -j$(nproc --all)
+       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
+       continue-on-error: true
 
-    - name: Switch to Python2
-      run: |
+     - name: Switch to Python2
+       run: |
         sudo rm -f /usr/bin/python /usr/bin/python3.6 /usr/bin/python3.6m /usr/local/bin/python
         sudo ln -sf /usr/bin/python2.7 /usr/bin/python
-      continue-on-error: true
+       continue-on-error: true
     
-    - name: Building recovery
-      shell: bash
-      run: |
-        source build/envsetup.sh
-        export ALLOW_MISSING_DEPENDENCIES=true        
-        lunch ${{ inputs.MAKEFILE_NAME }}-eng && make clean && ${{ inputs.BUILD_TARGET }} -j$(nproc --all)
-      working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
+     - name: Building recovery
+       shell: bash
+       run: |
+         source build/envsetup.sh
+         export ALLOW_MISSING_DEPENDENCIES=true        
+         lunch ${{ inputs.MAKEFILE_NAME }}-eng && make clean && ${{ inputs.BUILD_TARGET }} -j$(nproc --all)
+       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
 
-    - name: Check Build Makefile
-      run: |
-        cd android-recovery
-        if [ -f out/target/product/${{ inputs.DEVICE_NAME }}/recovery.img ]; then
-            echo "BUILD_TARGET_NAME=recovery" >> $GITHUB_ENV
-        elif [ -f out/target/product/${{ inputs.DEVICE_NAME }}/boot.img ]; then
-            echo "BUILD_TARGET_NAME=boot" >> $GITHUB_ENV
-        else
-            echo "BUILD_TARGET_NAME=vendor_boot" >> $GITHUB_ENV
-        fi
+     - name: Check Build Makefile
+       run: |
+         cd android-recovery
+         if [ -f out/target/product/${{ inputs.DEVICE_NAME }}/recovery.img ]; then
+             echo "BUILD_TARGET_NAME=recovery" >> $GITHUB_ENV
+         elif [ -f out/target/product/${{ inputs.DEVICE_NAME }}/boot.img ]; then
+             echo "BUILD_TARGET_NAME=boot" >> $GITHUB_ENV
+         else
+             echo "BUILD_TARGET_NAME=vendor_boot" >> $GITHUB_ENV
+         fi
 
-    - name: Set Build Date # Output will be use in Release
-      run: |
-        echo "BUILD_DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
+     - name: Set Build Date # Output will be use in Release
+       run: |
+         echo "BUILD_DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      if: inputs.upload_releases == false || github.event_name != 'workflow_dispatch'
-      with:
-        name: PBRP-Recovery-${{ env.DEVICE_NAME }}-${{ env.BUILD_DATE }}
-        path: |
-          ${{ env.OUTPUT_DIR }}/*.img
-          ${{ env.OUTPUT_DIR }}/*.tar
-          ${{ env.OUTPUT_DIR }}/*vbmeta*
-          ${{ env.OUTPUT_DIR }}/*.cpio
+     - name: Upload Artifacts
+       uses: actions/upload-artifact@v4
+       if: inputs.upload_releases == false || github.event_name != 'workflow_dispatch'
+       with:
+         name: PBRP-Recovery-${{ env.DEVICE_NAME }}-${{ env.BUILD_DATE }}
+         path: |
+           ${{ env.OUTPUT_DIR }}/*.img
+           ${{ env.OUTPUT_DIR }}/*.tar
+           ${{ env.OUTPUT_DIR }}/*vbmeta*
+           ${{ env.OUTPUT_DIR }}/*.cpio
 
-    - name: Upload to Release
-      if: success()
-      uses: softprops/action-gh-release@master
-      #uses: softprops/action-gh-release@v2
-      with:
+     - name: Upload to Release
+       if: success()
+       uses: softprops/action-gh-release@master
+       #uses: softprops/action-gh-release@v2
+       with:
         files: | 
           ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/${{ env.BUILD_TARGET_NAME }}.img
           ${{ env.OUTPUT_DIR}}/${{ inputs.DEVICE_NAME }}/*vendor*.img
@@ -221,37 +231,37 @@ jobs:
         prerelease: true
         draft: false
 
-    - name: Run LDCheck
-      if: inputs.LDCHECK == true
-      run: |
-        cd tools
-        mv -n libneeds ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root/
-        mv -n ldcheck ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root/
-        cd ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root
-        python3 ldcheck -p system/lib64:vendor/lib64:system/lib:vendor/lib -d ${{ inputs.LDCHECKPATH }}
-        echo "Done checking missing dependencies. Review, and reconfigure your tree."
-      continue-on-error: true
+     - name: Run LDCheck
+       if: inputs.LDCHECK == true
+       run: |
+         cd tools
+         mv -n libneeds ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root/
+         mv -n ldcheck ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root/
+         cd ${GITHUB_WORKSPACE}/${{ env.OUTPUT_DIR }}/${{ inputs.DEVICE_NAME }}/recovery/root
+         python3 ldcheck -p system/lib64:vendor/lib64:system/lib:vendor/lib -d ${{ inputs.LDCHECKPATH }}
+         echo "Done checking missing dependencies. Review, and reconfigure your tree."
+       continue-on-error: true
 
-    - name: Calculate Build Time
-      run: |
-        BUILD_END=$(date +%s)
-        BUILD_DURATION=$((BUILD_END - BUILD_START))
+     - name: Calculate Build Time
+       run: |
+         BUILD_END=$(date +%s)
+         BUILD_DURATION=$((BUILD_END - BUILD_START))
         
-        hours=$((BUILD_DURATION / 3600))
-        minutes=$(((BUILD_DURATION % 3600) / 60))
-        seconds=$((BUILD_DURATION % 60))
+         hours=$((BUILD_DURATION / 3600))
+         minutes=$(((BUILD_DURATION % 3600) / 60))
+         seconds=$((BUILD_DURATION % 60))
         
-        echo "Build completed in ${hours}h ${minutes}m ${seconds}s"
+         echo "Build completed in ${hours}h ${minutes}m ${seconds}s"
         
-        # Save build statistics
-        echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
-        echo "BUILD_HOURS=${hours}" >> $GITHUB_ENV
-        echo "BUILD_MINUTES=${minutes}" >> $GITHUB_ENV
-        echo "BUILD_SECONDS=${seconds}" >> $GITHUB_ENV
+         # Save build statistics
+         echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
+         echo "BUILD_HOURS=${hours}" >> $GITHUB_ENV
+         echo "BUILD_MINUTES=${minutes}" >> $GITHUB_ENV
+         echo "BUILD_SECONDS=${seconds}" >> $GITHUB_ENV
 
-    - name: Cleanup Workspace
-      if: always()
-      run: |
-        cd ${{ github.workspace }}
-        rm -rf android-recovery
-        df -h
+     - name: Cleanup Workspace
+       if: always()
+       run: |
+         cd ${{ github.workspace }}
+         rm -rf android-recovery
+         df -h
