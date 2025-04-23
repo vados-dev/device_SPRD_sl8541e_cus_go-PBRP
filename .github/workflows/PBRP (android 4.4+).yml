@@ -1,4 +1,4 @@
-name: Recovery Build PBRP 4.4+ (Ubuntu 18.04)
+name: Legacy Build PBRP (Ubuntu 18.04)
 permissions:
   contents: write
 on:
@@ -15,7 +15,7 @@ on:
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/vados-dev/device_SPRD_sl8541e_cus_go-PBRP'
+        default: 'https://github.com/vados-dev/device_SPRD_sl8541e_cus_go_PBRP'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
@@ -82,13 +82,14 @@ jobs:
         echo "Manifest Branch: ${{ inputs.MANIFEST_BRANCH }}"
         echo "Device Tree URL: ${{ inputs.DEVICE_TREE_URL }}"
         echo "Device Tree Branch: ${{ inputs.DEVICE_TREE_BRANCH }}"
+        echo "Device Path: ${{ inputs.DEVICE_PATH }}"
         echo "Device Name: ${{ inputs.DEVICE_NAME }}"
         echo "Makefile Name: ${{ inputs.MAKEFILE_NAME }}"
         echo "Build target: ${{ inputs.BUILD_TARGET }}"
         echo "::endgroup::"
  
     - name: Check Out
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     # Cleanup The Actions Workspace Using Custom Composite Run Actions
     - name: Cleanup
