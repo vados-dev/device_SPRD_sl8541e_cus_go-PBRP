@@ -25,7 +25,7 @@ on:
         required: true
         default: 'sl8541e_cus_go'
       MAKEFILE_NAME:
-        description: 'MAKEFILE_NAME (without including .mk, Example: omni_7304F)'
+        description: 'MAKEFILE_NAME (without including .mk, Example: omni_YOUDEVICE)'
         required: true
         default: 'omni_sl8541e_cus_go'
       LDCHECK:
@@ -49,24 +49,20 @@ on:
         - boot
         - vendorboot
 
-#      COMMON_TREE_URL:
-#        description: 'COMMON_TREE_URL (if no common tree, leave blank)'
-#        required: false
-#      COMMON_PATH:
-#        description: 'COMMON_PATH (if no common tree, leave blank)'
-#        required: false
 jobs: 
   build:
     name: Build PBRP by ${{ github.actor }}
-    if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container:
       image: ghcr.io/catthehacker/ubuntu:runner-18.04
     env:
-      LC_ALL: "C.UTF-8"
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      LC_ALL: "C.UTF-8"
       OUTPUT_DIR: android-recovery/out/target/product
       DEVICE_PATH: device_tree
+      GITHUB_TOKEN: ${{ secrets.amster }}
+    permissions:
+      contents: write
 
     steps:
     - name: Initial Setup
@@ -107,12 +103,12 @@ jobs:
         distribution: 'zulu'
         java-version: '8'
 
-    - name: Setup SSH Keys
-      if: ${{ startsWith(github.event.inputs.MANIFEST_URL, 'git@github.com') }}
-      uses: webfactory/ssh-agent@v0.9.1
-      with:
-          ssh-private-key: |
-              ${{ secrets.SSH_PRIVATE_KEY }}
+#    - name: Setup SSH Keys
+#      if: ${{ startsWith(github.event.inputs.MANIFEST_URL, 'git@github.com') }}
+#      uses: webfactory/ssh-agent@v0.9.1
+#      with:
+#          ssh-private-key: |
+#              ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Install repo
       run: |
@@ -146,25 +142,12 @@ jobs:
         git clone ${{ inputs.DEVICE_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ env.DEVICE_PATH }}
       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
 
-#    - name: Clone common tree
-#      if: |
-#        inputs.COMMON_TREE_URL != null
-#        && inputs.COMMON_PATH != null
-#      run: |
-#        git clone ${{ inputs.COMMON_TREE_URL }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ inputs.COMMON_PATH }}
-#      working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
-
     - name: Sync Device Dependencies
       run: |
         bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ env.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
         repo sync -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.android-recovery-folder }}
       continue-on-error: true
-
-#    - name: Set Swap Space
-#      uses: pierotofy/set-swap-space@master
-#      with:
-#        swap-size-gb: 12
 
     - name: Switch to Python2
       run: |
@@ -234,8 +217,6 @@ jobs:
           > Note: This is an automated build. Please test thoroughly before using.
         prerelease: true
         draft: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Run LDCheck
       if: inputs.LDCHECK == true
@@ -249,7 +230,6 @@ jobs:
       continue-on-error: true
 
     - name: Calculate Build Time
-      if: always()
       run: |
         BUILD_END=$(date +%s)
         BUILD_DURATION=$((BUILD_END - BUILD_START))
