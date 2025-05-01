@@ -24,7 +24,7 @@ jobs:
                   fetch-depth: 1
 
             - name: "Upload dummy script"
-              uses: "actions/upload-artifact@v3"
+              uses: "actions/upload-artifact@v4"
               with:
                   name: dummy-script
                   path: dummy_script.sh
