@@ -30,7 +30,7 @@ jobs:
                   path: dummy_script.sh
 
             - name: "Download dummy script"
-              uses: "actions/download-artifact@v3"
+              uses: "actions/download-artifact@v5"
               with:
                   name: dummy-script
                   path: ./downloaded_scripts
